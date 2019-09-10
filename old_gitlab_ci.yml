@@ -1,0 +1,80 @@
+variables:
+#    SCHEDULER_PARAMETERS: " --nodes=1 --partition=ecp-x86_64"
+    NMC_FE1_SLURM_PARAMETERS:  "-N1 -p ecp-p9-4v100 --extra-node-info=*:*:* -t 0:30:00 srun --pty bash --login"
+stages:
+    - build
+    - test
+# <<: *slurm
+.slurm: &slurm
+    tags: ['nmc', 'slurm', 'xx-testing', 'dosequis']
+build:
+    stage: build
+    # Will inherit the .slurm: &slurm
+    <<: *slurm
+    script:
+        - echo "Running build"
+        - echo "this is a build of vtk-m"
+        - srun env | grep SLURM_JOB_NAME
+        - whoami
+        - echo "HOSTNAME=$HOSTNAME"
+        - . set_modules_p9.sh
+        - module list
+        - ls
+#
+#
+        - CI_PROJ_DIR=${PWD}
+        - echo "CI_PROJ_DIR="${CI_PROJ_DIR}
+        - . clone_vtkm.sh
+        - ls -ltr
+        - ls -ltr ./vtk-m
+        - mkdir vtkm-build
+        - pushd vtkm-build
+        - cp ../cmake_vtkm.sh .
+#      look at the dirs to see what files are there
+        - echo $PWD
+        - ls -latr
+#      use the cmake script that worked loggining into p9 to build vtk-m
+        - . cmake_vtkm.sh
+#       now that cmake worked correctly use make to setup vtk-m; vtk-m team can add make install if they want
+        - make -j 8
+        - echo " see what files have been created"
+        - ls -latr
+        - popd
+        - echo " files in the top dir; should see vtk-m and vtkm-build"
+    artifacts:
+        paths:
+           - vtkm-build/
+    only:
+       - web
+    variables:
+        NMC_FE1_SLURM_PARAMETERS: "-N1 -p ecp-p9-4v100 "
+    tags: ['nmc', 'slurm', 'xx-testing', 'dosequis']
+test:
+    stage: test
+    # Will inherit the .slurm: &slurm
+    <<: *slurm
+    script:
+        - echo "Running test of vtk-m build"
+        - echo "this is a test after  build of vtk-m"
+        - srun env | grep SLURM_JOB_NAME
+        - whoami
+        - echo "where am I, echo $PWD"
+        - echo $PWD
+        - ls -latr
+        - echo "HOSTNAME=$HOSTNAME"
+        - . set_modules_p9.sh
+        - module list
+        - CI_PROJ_DIR=${PWD}
+        - echo "CI_PROJ_DIR="${CI_PROJ_DIR}
+        - pushd vtkm-build
+        - ls
+        - echo " you should be seeing vtkm-test success after make test"
+        - make test
+        - popd
+#
+#
+    only:
+       - web
+    variables:
+        NMC_FE1_SLURM_PARAMETERS: "-N1 -p ecp-p9-4v100 "
+    tags: ['nmc', 'slurm', 'xx-testing', 'dosequis']
